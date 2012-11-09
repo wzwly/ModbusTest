@@ -27,11 +27,12 @@
 #endif
 
 
+class DevSlave;
 class QSerial : public QObject
 {
     Q_OBJECT
 public:
-    QSerial(QObject * p_);
+    QSerial(DevSlave* pSlave_,QObject * p_);
     ~QSerial();
     enum
     {
@@ -43,9 +44,11 @@ public:
         unsigned char szRxBuffer[MAX_BUFFER_SIZE];
         int  iRxLen;
         int  iTxLen;
+        bool bRxEn;
         TxRxBuffer()
         {
             iRxLen = 0; iTxLen = 0;
+            bRxEn = true;
         };
     };
 
@@ -59,6 +62,7 @@ private:
     int m_nFdModbus;//
     int m_nTimer;
     int m_nTemMs;
+    DevSlave* m_pSlave;
 public:
     static TxRxBuffer m_gTxRxBuffer;
     void SendBuffer();

@@ -1,4 +1,5 @@
 #include "serial.h"
+#include "slave.h"
 
 #include <QWSServer>
 #include <QSocketNotifier>
@@ -15,10 +16,12 @@
 
 QSerial::TxRxBuffer QSerial::m_gTxRxBuffer;
 
-QSerial::QSerial(QObject * p_)
+QSerial::QSerial(DevSlave* pSlave_, QObject * p_)
 {
     m_nFdModbus = -1;
+    m_pSlave = pSlave_;
     InitModbus();
+
 }
 
 QSerial::~QSerial()
@@ -59,6 +62,9 @@ void QSerial::InitModbus()
 
 void QSerial::OnReceiveChar()
 {
+    if (!m_gTxRxBuffer.bRxEn)
+        return;
+
     unsigned char _cRead[10];
     int _ret = Read(m_nFdModbus, _cRead, 10);
 
@@ -71,8 +77,11 @@ void QSerial::OnReceiveChar()
     }
     m_nTemMs = 10;
 
-    //here need to notify the view to deal package
-
+    if (m_pSlave)
+    {
+        //here need to notify the view to deal package
+        m_pSlave->CheckCommModbus(&m_gTxRxBuffer);
+    }    
 }
 
 
@@ -86,10 +95,7 @@ void QSerial::SendBuffer()
         {
             //deal send erro
         }
-
-
     }
-
 }
 
 
