@@ -12,12 +12,16 @@ public:
     void CheckCommModbus(QSerial::TxRxBuffer* pBuffer_);
 
 private:
+    void ReadCoil(void);
+
+    //===========================
+    void GetCoilVal(unsigned short addr_,unsigned char *pData_);
+private:
     QSerial::TxRxBuffer* m_pBuffer;
     unsigned char m_cSlaveAddr;
 };
-void BeginSend(void);
 
-void ReadCoil(void);
+
 void ReadRegisters(void);
 void ForceSingleCoil(void);
 void PresetSingleRegister(void);
@@ -26,7 +30,7 @@ void ForceMultipleCoils(void);
 
 unsigned short GetRegisterVal(unsigned short addr_,unsigned short *pData_);
 unsigned short setRegisterVal(unsigned short addr_,unsigned short wData_);
-unsigned short getCoilVal(unsigned short addr_,unsigned short *pData_);
+
 unsigned short setCoilVal(unsigned short addr_,unsigned short wData_);
 
 #endif // SLAVE_H

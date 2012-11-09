@@ -79,62 +79,7 @@ unsigned short crc16(unsigned char *puchMsg, unsigned int nDataLen)
 }
 /*
 //读线圈状态
-void ReadCoil(void)
-{
-    uint8 addr;
-    uint8 tempAddr;
-    uint8 byteCount;
-    uint8 bitCount;
-    uint16 crcData;
-    uint8 position;
-    uint8 i,k;
-    uint16 tempData;
-    uint8  exit = 0;
 
-    //addr = (receBuf[2]<<8) + receBuf[3];
-    //tempAddr = addr & 0xfff;
-    addr = receBuf[3];
-    tempAddr = addr;
-
-    //bitCount = (receBuf[4]<<8) + receBuf[5];	//读取的位个数
-    bitCount = receBuf[5];
-
-    byteCount = bitCount / 8;					//字节个数
-    if(bitCount%8 != 0)
-        byteCount++;
-
-    for(k=0;k<byteCount;k++)
-    {//字节位置
-        position = k + 3;
-        sendBuf[position] = 0;
-        for(i=0;i<8;i++)
-        {
-            getCoilVal(tempAddr,&tempData);
-
-            sendBuf[position] |= tempData << i;
-            tempAddr++;
-            if(tempAddr >= addr+bitCount)
-            {	//读完
-                exit = 1;
-                break;
-            }
-        }
-        if(exit == 1)
-            break;
-    }
-
-    sendBuf[0] = localAddr;
-    sendBuf[1] = 0x01;
-    sendBuf[2] = byteCount;
-    byteCount += 3;
-    crcData = crc16(sendBuf,byteCount);
-    sendBuf[byteCount] = crcData >> 8;
-    byteCount++;
-    sendBuf[byteCount] = crcData & 0xff;
-    sendCount = byteCount + 1;
-
-    beginSend();
-}//void readCoil(void)
 
 //读寄存器
 void readRegisters(void)
@@ -261,61 +206,7 @@ void presetMultipleRegisters(void)
 
 
 /*
-//取线圈状态 返回0表示成功
-uint16 getCoilVal(uint16 addr,uint16 *tempData)
-{
-    uint16 result = 0;
-    uint16 tempAddr;
 
-    tempAddr = addr & 0xfff;
-    //只取低8位地址
-    switch(tempAddr & 0xff)
-    {
-        case 0:
-            *tempData = led0;
-                break;
-        case 1:
-                *tempData = led1;
-                break;
-        case 2:
-                *tempData = led2;
-                break;
-        case 3:
-                *tempData = led3;
-                break;
-        case 4:
-                *tempData = led4;
-                break;
-        case 5:
-                *tempData = led5;
-                break;
-        case 6:
-                *tempData = led6;
-                break;
-        case 7:
-                *tempData = led7;
-                break;
-        case 8:
-                break;
-        case 9:
-                break;
-        case 10:
-                break;
-        case 11:
-                break;
-        case 12:
-                break;
-        case 13:
-                break;
-        case 14:
-                break;
-        case 15:
-                break;
-        case 16:
-                break;
-        default:
-                break;
-    }
 
     return result;
 }//uint16 getCoilVal(uint16 addr,uint16 *data)
@@ -494,6 +385,43 @@ DevSlave::DevSlave(int nAddr_)
        m_cSlaveAddr = nAddr_;
 }
 
+void DevSlave::GetCoilVal(unsigned short addr_,unsigned char *pData_)
+{ 
+    //只取低8位地址
+    int _Ret = 0;
+    switch(addr_ & 0xff)
+    {
+    case 0:
+        _Ret = 1;
+        break;
+    case 1:
+        _Ret = 0;
+        break;
+    case 2:
+        _Ret = 1;
+        break;
+    case 3:
+        _Ret = 0;
+        break;
+    case 4:
+        _Ret = 1;
+        break;
+    case 5:
+        _Ret = 0;
+        break;
+    case 6:
+        _Ret = 1;
+        break;
+    case 7:
+        _Ret = 0;
+        break;
+    default:
+        break;
+    }
+    *pData_ = (unsigned char)_Ret;
+}
+
+
 void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
 {
     if (m_pBuffer != pBuffer_)
@@ -525,7 +453,7 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                 {
                     if(_pRecBuf[1] == 1)
                     {
-                        //readCoil();//读取线圈状态(读取点 16位以内)
+                        ReadCoil();//读取线圈状态(读取点 16位以内)
                     }
                     else if(_pRecBuf[1] == 3)
                     {
@@ -590,3 +518,49 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
        }
 }
 
+//1
+void DevSlave::ReadCoil(void)
+{
+    unsigned char _cAddr, _bitCnt, _byteCnt;
+    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
+    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
+
+    _cAddr = _pRecBuf[3];
+    _bitCnt = _pRecBuf[5];
+    _byteCnt =  _bitCnt / 8;
+    if (_bitCnt % 8 != 0)
+        _byteCnt++;
+
+    unsigned char _MaxAddr = _cAddr + _bitCnt;
+    unsigned char _tempData;
+
+    bool _bExit = false;
+    for(int _k = 0; _k < _byteCnt; ++_k)
+    {
+        //字节位置
+        _pTxBuf[_k + 3] = 0;
+        for(int _i = 0; _i < 8; ++_i)
+        {
+            GetCoilVal(_cAddr++,&_tempData);
+            _pTxBuf[_k + 3] |= _tempData << _i;
+            if(_cAddr >= _MaxAddr)
+            {	//读完
+                _bExit = true;
+                break;
+            }
+        }
+        if(_bExit)
+            break;
+    }
+
+    _pTxBuf[0] = m_cSlaveAddr;
+    _pTxBuf[1] = 0x01;
+    _pTxBuf[2] = _byteCnt;
+
+    _byteCnt += 3;
+    unsigned short _crcData = crc16(_pTxBuf,_byteCnt);
+    _pTxBuf[_byteCnt++] = _crcData >> 8;
+    _pTxBuf[_byteCnt++] = _crcData & 0xff;
+    m_pBuffer->iTxLen = _byteCnt;
+    //beginSend();
+}
