@@ -1,4 +1,4 @@
-#include "slave.h"
+#include "master.h"
 
 //字地址 0 - 255 (只取低8位)
 //位地址 0 - 255 (只取低8位)
@@ -79,50 +79,104 @@ static unsigned short crc16(unsigned char *puchMsg, unsigned int nDataLen)
 }
 
 
-DevSlave::DevSlave(int nAddr_)
+DevMaster::DevMaster(int nAddr_, QSerial::TxRxBuffer* pBuffer_)
+:m_nRepeatTime(3)
 {
-       m_pBuffer = NULL;
+       m_pBuffer = pBuffer_;
        m_cSlaveAddr = nAddr_;
 }
 
-void DevSlave::GetCoilVal(unsigned short addr_,unsigned char *pData_)
-{ 
-    //只取低8位地址
-    int _Ret = 0;
-    addr_ =  addr_ % 8;
-    switch(addr_ & 0xff)
-    {
-    case 0:
-        _Ret = 0;
-        break;
-    case 1:
-        _Ret = 1;
-        break;
-    case 2:
-        _Ret = 1;
-        break;
-    case 3:
-        _Ret = 0;
-        break;
-    case 4:
-        _Ret = 0;
-        break;
-    case 5:
-        _Ret = 1;
-        break;
-    case 6:
-        _Ret = 1;
-        break;
-    case 7:
-        _Ret = 0;
-        break;
-    default:
-        break;
-    }
-    *pData_ = (unsigned char)_Ret;
+void DevMaster::BegineSend()
+{
+    unsigned char* _pRecBuf = QSerial::m_gSlaveBuffer.szRxBuffer;
+    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
+    QSerial::m_gSlaveBuffer.iRxLen = m_pBuffer->iTxLen;
+    memcpy(_pRecBuf, _pTxBuf, m_pBuffer->iTxLen);
 }
 
-void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
+//1
+void DevMaster::ReadCoil(unsigned short wAddr_, unsigned short wQty_,unsigned char* pData_)
+{
+    //unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
+    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
+
+    _pTxBuf[0] = m_cSlaveAddr;
+    _pTxBuf[1] = 0x01;
+    _pTxBuf[2] = wAddr_ >> 8;
+    _pTxBuf[3] = wAddr_ & 0xff;
+    _pTxBuf[4] = wQty_ >> 8;
+    _pTxBuf[5] = wQty_ & 0xff;
+    unsigned short _crcData = crc16(_pTxBuf, 6);
+    _pTxBuf[6] = _crcData >> 8;
+    _pTxBuf[7] = _crcData & 0xff;
+    m_pBuffer->iTxLen = 8;
+# if TEST
+    BegineSend(); //发送
+#else
+    int _nloop = m_nRepeatTime;
+    CheckStatus _sRet;
+    while(_nloop > 0)
+    {
+        _nloop--;
+        BegineSend(); //发送
+
+        while(1)
+        {
+            usleep(1);
+            if (m_pBuffer->m_nEchoTimeOut <= 0)
+                break; //超时
+            _sRet = CheckReadCoil(wQty_,pData_);
+            if (CHECK_OK == _sRet) //校验正确
+            {
+                _nloop = 0;
+                break;
+            }
+            else if (ECHO_ERRO == _sRet)
+            {
+                break;  //校验错误
+            }
+        }
+    }
+#endif
+}
+
+DevMaster::CheckStatus DevMaster::CheckReadCoil(unsigned short wQty_,unsigned char* pData_)
+{
+    //最少5为 slave cmd addr crc0 crc1
+    if (m_pBuffer->iRxLen <= 4)
+        return RECEIVE_STATUS;
+
+    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
+    if (_pRecBuf[0] == m_cSlaveAddr)
+    {
+        if (_pRecBuf[1] == 0x81)
+            return ECHO_ERRO;//接受错误
+
+        if (_pRecBuf[1] == 0x01)
+        {
+            unsigned char _byteCnt = wQty_ / 8;
+            if (wQty_ % 8 != 0)
+                _byteCnt++;
+            int _nLen = _byteCnt + 5;
+            if (m_pBuffer->iRxLen < _nLen)
+                return RECEIVE_STATUS;
+            unsigned short _crcData, _crcOld;
+            _crcData = crc16(_pRecBuf,_nLen - 2);
+            _crcOld = MakeShort(_pRecBuf[_nLen - 2],_pRecBuf[_nLen -1]);
+
+            if (_crcData == _crcOld)
+            {
+                memcpy(pData_, &_pRecBuf[3], _byteCnt);
+                return CHECK_OK;//接受OK
+            }
+            else
+               return ECHO_ERRO;//接受错误
+        }
+    }
+    return ECHO_ERRO;//接受错误
+}
+#if 0
+DevMaster::CheckStatus CheckCommModbus()
 {
     if (m_pBuffer != pBuffer_)
         m_pBuffer = pBuffer_;
@@ -218,224 +272,4 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
        }
 }
 
-//1
-void DevSlave::ReadCoil(void)
-{
-    unsigned char  _byteCnt;
-    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-
-    unsigned short _wAddr = MakeShort(_pRecBuf[2], _pRecBuf[3]);
-    unsigned short _bitCnt = MakeShort(_pRecBuf[4], _pRecBuf[5]);
-    _byteCnt =  _bitCnt / 8;
-    if (_bitCnt % 8 != 0)
-        _byteCnt++;
-
-    unsigned short _MaxAddr = _wAddr + _bitCnt;
-    unsigned char _tempData;
-
-    bool _bExit = false;
-    for(int _k = 0; _k < _byteCnt; ++_k)
-    {
-        //字节位置
-        _pTxBuf[_k + 3] = 0;
-        for(int _i = 0; _i < 8; ++_i)
-        {
-            GetCoilVal(_wAddr++,&_tempData);
-            _pTxBuf[_k + 3] |= _tempData << _i;
-            if(_wAddr >= _MaxAddr)
-            {	//读完
-                _bExit = true;
-                qDebug() << "I receive get cmd 01";
-                break;
-            }
-        }
-        if(_bExit)
-            break;
-    }
-
-    _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = 0x01;
-    _pTxBuf[2] = _byteCnt;
-
-    _byteCnt += 3;
-    unsigned short _crcData = crc16(_pTxBuf,_byteCnt);
-    _pTxBuf[_byteCnt++] = _crcData >> 8;
-    _pTxBuf[_byteCnt++] = _crcData & 0xff;
-    m_pBuffer->iTxLen = _byteCnt;
-    BegineSend();
-}
-
-
-//读寄存器 3
-void DevSlave::ReadRegisters()
-{
-    unsigned char _byteCnt;
-    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-
-    unsigned short _wAddr = MakeShort(_pRecBuf[2],_pRecBuf[3]);
-    unsigned short _ReadCnt = MakeShort(_pRecBuf[4],_pRecBuf[5]);
-    _byteCnt = _ReadCnt * 2;
-
-    unsigned short _tempData = 0x5555;
-    for(int _i=0;_i < _byteCnt; _i += 2)
-    {
-        //getRegisterVal(tempAddr,&tempData);
-        _pTxBuf[_i+3] = _tempData >> 8;
-        _pTxBuf[_i+4] = _tempData & 0xff;
-    }
-    qDebug() << "read data ok , cmd 3";
-    _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = 3;
-    _pTxBuf[2] = _byteCnt;
-    _byteCnt += 3;
-    unsigned short _crcData = crc16(_pTxBuf,_byteCnt);
-    _pTxBuf[_byteCnt++] = _crcData >> 8;
-    _pTxBuf[_byteCnt++] = _crcData & 0xff;
-    m_pBuffer->iTxLen = _byteCnt;
-    BegineSend();
-}
-
-
-//强制单个线圈 5
-void DevSlave::ForceSingleCoil()
-{
-    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-
-    unsigned short _wAddr = MakeShort(_pRecBuf[2],_pRecBuf[3]);
-    unsigned short _onOff = MakeShort(_pRecBuf[4],_pRecBuf[5]);
-
-    unsigned short _tempData;
-    if( _onOff & 0xffff)
-    {	//设为ON
-        _tempData = 1;
-    }
-    else if( _onOff == 0x0000)
-    {	//设为OFF
-        _tempData = 0;
-    }
-
-    //setCoilVal(tempAddr,tempData);
-    qDebug() <<"Set the Coil Val";
-
-    for(int _i=0; _i< m_pBuffer->iRxLen; ++_i)
-    {
-        _pTxBuf[_i] = _pRecBuf[_i];
-    }
-    m_pBuffer->iTxLen = m_pBuffer->iRxLen;
-    BegineSend();
-}
-
-
-void DevSlave::PresetSingleRegister()//6
-{
-    //unsigned char  _byteCnt;
-    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-
-    unsigned short _tempData;
-    unsigned short _wAddr = MakeShort(_pRecBuf[2],_pRecBuf[3]);
-
-    _tempData = MakeShort(_pRecBuf[4], _pRecBuf[5]);
-    //setRegisterVal(_wAddr + _i,_tempData;
-    qDebug()<< "write ok ,cmd 16";
-
-    for(int _i=0; _i< m_pBuffer->iRxLen; ++_i)
-    {
-        _pTxBuf[_i] = _pRecBuf[_i];
-    }
-    m_pBuffer->iTxLen = m_pBuffer->iRxLen;
-     BegineSend();
-}
-
-void DevSlave::ForceMultipleCoils() //15
-{
-    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-
-    unsigned short _wAddr = MakeShort(_pRecBuf[2],_pRecBuf[3]);
-    unsigned short _setCnt = MakeShort(_pRecBuf[4],_pRecBuf[5]);
-    unsigned char _byteCnt = _pRecBuf[6];
-
-    unsigned int _iSet = 0;
-    bool _bExit = false;
-    for (int _i = 0; _i < _byteCnt; ++_i)
-    {
-        unsigned char _ch = _pRecBuf[7 + _i];
-        for(int _k = 0; _k < 8; ++_k)
-        {
-
-            if (_ch & (0x01 << _k))
-            {
-                //Set _wAddr + _iSet whith ON
-            }
-            else
-            {
-                //Set _wAddr + _iSet whith OFF
-            }
-
-            _iSet++;
-            if (_iSet >= _setCnt)
-            {_bExit = true; break;}
-
-        }
-        if (_bExit)
-            break;
-    }
-    qDebug() <<"Set the Coil Val";
-
-    _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = _pTxBuf[1];
-    _pTxBuf[2] = _wAddr >> 8;
-    _pTxBuf[3] = _wAddr & 0xff;
-    _pTxBuf[4] = _setCnt >> 8;
-    _pTxBuf[5] = _setCnt & 0xff;
-    unsigned short _crcData = crc16(_pTxBuf,6);
-    _pTxBuf[6] = _crcData >> 8;
-    _pTxBuf[7] = _crcData & 0xff;
-    m_pBuffer->iTxLen = 8;
-    BegineSend();
-}
-
-//设置多个寄存器16
-void DevSlave::PresetMultipleRegisters()
-{
-    //unsigned char  _byteCnt;
-    unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-
-    unsigned short _tempData;
-    unsigned short _wAddr = MakeShort(_pRecBuf[2],_pRecBuf[3]);
-    unsigned short _setCnt = MakeShort(_pRecBuf[4],_pRecBuf[5]);
-    //_byteCnt = _pRecBuf[6];
-
-    for(int _i=0; _i < _setCnt;++_i)
-    {
-        _tempData = MakeShort(_pRecBuf[_i*2 + 7], _pRecBuf[_i*2 + 8]);
-        //setRegisterVal(_wAddr + _i,_tempData;
-        qDebug()<< "write ok ,cmd 16";
-    }
-
-    _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = _pTxBuf[1];
-    _pTxBuf[2] = _wAddr >> 8;
-    _pTxBuf[3] = _wAddr & 0xff;
-    _pTxBuf[4] = _setCnt >> 8;
-    _pTxBuf[5] = _setCnt & 0xff;
-    unsigned short _crcData = crc16(_pTxBuf,6);
-    _pTxBuf[6] = _crcData >> 8;
-    _pTxBuf[7] = _crcData & 0xff;
-    m_pBuffer->iTxLen = 8;
-    BegineSend();
-}
-
-
-void DevSlave::BegineSend()
-{
-    unsigned char* _pRecBuf = QSerial::m_gMasterBuffer.szRxBuffer;
-    unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
-    QSerial::m_gMasterBuffer.iRxLen = m_pBuffer->iTxLen;
-    memcpy(_pRecBuf, _pTxBuf, m_pBuffer->iTxLen);
-}
+#endif

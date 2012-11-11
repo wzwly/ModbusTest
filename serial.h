@@ -45,6 +45,7 @@ public:
         int  iRxLen;
         int  iTxLen;
         bool bRxEn;
+        int m_nEchoTimeOut;
         TxRxBuffer()
         {
             iRxLen = 0; iTxLen = 0;
@@ -65,6 +66,8 @@ private:
     DevSlave* m_pSlave;
 public:
     static TxRxBuffer m_gTxRxBuffer;
+    static TxRxBuffer m_gMasterBuffer;
+    static TxRxBuffer m_gSlaveBuffer;
     void SendBuffer();
     void ClearReceive(){ m_gTxRxBuffer.iRxLen = 0;}
 };

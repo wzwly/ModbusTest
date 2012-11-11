@@ -16,6 +16,10 @@
 
 QSerial::TxRxBuffer QSerial::m_gTxRxBuffer;
 
+QSerial::TxRxBuffer QSerial::m_gMasterBuffer;
+QSerial::TxRxBuffer QSerial::m_gSlaveBuffer;
+
+
 QSerial::QSerial(DevSlave* pSlave_, QObject * p_)
 {
     m_nFdModbus = -1;
@@ -95,6 +99,8 @@ void QSerial::SendBuffer()
         {
             //deal send erro
         }
+        else
+            m_gTxRxBuffer.m_nEchoTimeOut = 20;
     }
 }
 
@@ -110,4 +116,7 @@ void QSerial::timerEvent(QTimerEvent *event_)
            m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
         }
     }
+
+    if (m_gTxRxBuffer.m_nEchoTimeOut > 0)
+        m_gTxRxBuffer.m_nEchoTimeOut--;
 }

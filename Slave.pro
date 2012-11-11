@@ -6,8 +6,12 @@ TEMPLATE = app
 SOURCES += main.cpp \
     mainwindow.cpp \
     serial.cpp \
-    slave.cpp
+    slave.cpp \
+    master.cpp
 HEADERS += mainwindow.h \
     serial.h \
-    slave.h
+    slave.h \
+    master.h
 FORMS += mainwindow.ui
+
+DEFINES += TEST
