@@ -21,14 +21,18 @@ public:
 
 public:
     void ReadCoil(unsigned short wAddr_, unsigned short wQty_, unsigned char* pData_);    //1
-
-    void ReadRegisters(void);//3
-    void ForceSingleCoil(); //5
-    void PresetSingleRegister(); //6
-    void ForceMultipleCoils(); //15
-    void PresetMultipleRegisters();//16
+    void ReadRegisters(unsigned short wAddr_, unsigned short wQty_, unsigned char* pData_);//3
+    void ForceSingleCoil(unsigned short wAddr_, bool bOnOff_); //5
+    void PresetSingleRegister(unsigned short wAddr_, unsigned short wVal_); //6
+    void ForceMultipleCoils(unsigned short wAddr_, unsigned short wQty_, unsigned char* pData_, unsigned char byteCnt_ = 0); //15
+    void PresetMultipleRegisters(unsigned short wAddr_, unsigned short wQty_, unsigned char* pData_, unsigned char byteCnt_ = 0);//16
     //
     CheckStatus CheckReadCoil(unsigned short wQty_,unsigned char* pData_); //1
+    CheckStatus CheckReadRegisters(unsigned short wQty_,unsigned char* pData_); //3
+    CheckStatus CheckForceSingleCoil(unsigned short wOnOff_); //5
+    CheckStatus CheckPresetSingleRegister(unsigned short wVal_); //6
+    CheckStatus CheckForceMultipleCoils(unsigned short wQty_);//15
+    CheckStatus CheckPresetMultipleRegisters(unsigned short wQty_);//16
 private:
     //===========================
     unsigned short MakeShort(unsigned char H_, unsigned int L)
