@@ -19,6 +19,7 @@ public:
 public:
 
 
+
 public:
     void ReadCoil(unsigned short wAddr_, unsigned short wQty_, unsigned char* pData_);    //1
 
