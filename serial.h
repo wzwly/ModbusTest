@@ -2,6 +2,8 @@
 #define SERIAL_H
 
 #include <QObject>
+#include <QThread>
+#include <QSemaphore>
 
 //该宏定义硬件的操作，因此，对硬件的操作函用这里的宏来写，就不用加编译条件了
 #if 1//ARM
@@ -28,7 +30,7 @@
 
 
 class DevSlave;
-class QSerial : public QObject
+class QSerial : public QThread
 {
     Q_OBJECT
 public:
@@ -45,17 +47,20 @@ public:
         int  iRxLen;
         int  iTxLen;
         bool bRxEn;
+        bool bTxEn;
         int m_nEchoTimeOut;
         TxRxBuffer()
         {
             iRxLen = 0; iTxLen = 0;
             bRxEn = true;
+            bTxEn = false;
         };
     };
 
 protected:
     void InitModbus();
     void timerEvent(QTimerEvent *event_); //定时器响应函数
+    virtual void run();
 private slots:
     void OnReceiveChar();
 
@@ -64,12 +69,20 @@ private:
     int m_nTimer;
     int m_nTemMs;
     DevSlave* m_pSlave;
+
+    int m_nExit;
 public:
     static TxRxBuffer m_gTxRxBuffer;
     static TxRxBuffer m_gMasterBuffer;
     static TxRxBuffer m_gSlaveBuffer;
+    static QSemaphore m_Semaphore;
     void SendBuffer();
     void ClearReceive(){ m_gTxRxBuffer.iRxLen = 0;}
+
+    void StartThread(Priority p_) {m_nExit = 1; start(p_); }
+    void ExitThread(){m_nExit = 0;}
+    bool IsExit() {return  m_nExit == -1;}
+
 };
 
 #endif // SERIAL_H

@@ -112,6 +112,7 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
     unsigned short _wTemp;
     unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
 
+    unsigned char _cmd = _pRecBuf[1];
     switch(_pRecBuf[1])
     {
     case 1://读取线圈状态(读取点 16位以内)
@@ -147,7 +148,13 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                     }
                 }
             }
-            m_pBuffer->iRxLen = 0;
+
+            if (QSerial::m_Semaphore.available())
+            {
+                QSerial::m_Semaphore.acquire();
+                 m_pBuffer->iRxLen = 0;
+                QSerial::m_Semaphore.release();
+            }
         }
         break;
 
@@ -166,7 +173,13 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                        ForceMultipleCoils();
                    }
                }
-               m_pBuffer->iRxLen = 0;
+
+               if (QSerial::m_Semaphore.available())
+               {
+                   QSerial::m_Semaphore.acquire();
+                    m_pBuffer->iRxLen = 0;
+                   QSerial::m_Semaphore.release();
+               }
            }
            break;
 
@@ -186,7 +199,12 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                        PresetMultipleRegisters();
                    }
                }
-               m_pBuffer->iRxLen = 0;
+               if (QSerial::m_Semaphore.available())
+               {
+                   QSerial::m_Semaphore.acquire();
+                    m_pBuffer->iRxLen = 0;
+                   QSerial::m_Semaphore.release();
+               }
            }
            break;
 
@@ -414,8 +432,19 @@ void DevSlave::PresetMultipleRegisters()
 
 void DevSlave::BegineSend()
 {
+#if TEST
     unsigned char* _pRecBuf = QSerial::m_gMasterBuffer.szRxBuffer;
     unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
     QSerial::m_gMasterBuffer.iRxLen = m_pBuffer->iTxLen;
     memcpy(_pRecBuf, _pTxBuf, m_pBuffer->iTxLen);
+#else
+    m_pBuffer->bTxEn = true;
+    if (QSerial::m_Semaphore.available())
+    {
+        QSerial::m_Semaphore.acquire();
+        m_pBuffer->iRxLen = 0;
+        QSerial::m_gMasterBuffer.iRxLen = 0;
+        QSerial::m_Semaphore.release();
+    }
+#endif
 }

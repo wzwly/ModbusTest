@@ -18,14 +18,14 @@ QSerial::TxRxBuffer QSerial::m_gTxRxBuffer;
 
 QSerial::TxRxBuffer QSerial::m_gMasterBuffer;
 QSerial::TxRxBuffer QSerial::m_gSlaveBuffer;
-
+QSemaphore QSerial::m_Semaphore(1);
 
 QSerial::QSerial(DevSlave* pSlave_, QObject * p_)
 {
     m_nFdModbus = -1;
     m_pSlave = pSlave_;
-    InitModbus();
-
+    //InitModbus();
+    m_nTimer = startTimer(1); //开启定时器，1ms一次
 }
 
 QSerial::~QSerial()
@@ -55,9 +55,7 @@ void QSerial::InitModbus()
         perror("tcsetattr   error");
         assert(false);
         exit(1);
-    }
-
-    m_nTimer = startTimer(1); //开启定时器，1ms一次
+    }   
     //注册响应
     QSocketNotifier* notify = new QSocketNotifier(m_nFdModbus, QSocketNotifier::Read, this);
     connect(notify, SIGNAL(activated(int)), this, SLOT(OnReceiveChar()));
@@ -99,8 +97,6 @@ void QSerial::SendBuffer()
         {
             //deal send erro
         }
-        else
-            m_gTxRxBuffer.m_nEchoTimeOut = 20;
     }
 }
 
@@ -108,15 +104,54 @@ void QSerial::SendBuffer()
 void QSerial::timerEvent(QTimerEvent *event_)
 {
     //in receive mode
-    if (m_nTemMs > 0 && m_gTxRxBuffer.iRxLen > 0)
-    {
-        --m_nTemMs;
-        if (m_nTemMs == 0)
-        {
-           m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
-        }
-    }
+   // if (m_nTemMs > 0 && m_gTxRxBuffer.iRxLen > 0)
+   // {
+   //     --m_nTemMs;
+   //     if (m_nTemMs == 0)
+   //     {
+    //       m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
+   //     }
+   // }
 
     if (m_gTxRxBuffer.m_nEchoTimeOut > 0)
         m_gTxRxBuffer.m_nEchoTimeOut--;
+}
+
+void QSerial::run()
+{
+    QSerial::TxRxBuffer* _pMaster = &m_gMasterBuffer;
+    QSerial::TxRxBuffer* _pSlave = &m_gSlaveBuffer;
+    while(m_nExit)
+    {
+        usleep(1);
+
+        if (QSerial::m_Semaphore.available())
+        {
+            QSerial::m_Semaphore.acquire();
+            if (_pMaster->bTxEn)
+            {
+                if (_pSlave->iRxLen < _pMaster->iTxLen)
+                {
+                    _pSlave->szRxBuffer[_pSlave->iRxLen] = _pMaster->szTxBuffer[_pSlave->iRxLen];
+                    _pSlave->iRxLen++;
+                    m_pSlave->CheckCommModbus(_pSlave);
+                }
+                else
+                    _pMaster->bTxEn = false;
+            }
+
+            if (_pSlave->bTxEn)
+            {
+                if (_pMaster->iRxLen < _pSlave->iTxLen)
+                {
+                    _pMaster->szRxBuffer[_pMaster->iRxLen] = _pSlave->szTxBuffer[_pMaster->iRxLen];
+                    _pMaster->iRxLen++;
+                }
+                else
+                    _pSlave->bTxEn = false;
+            }
+            QSerial::m_Semaphore.release();
+        }
+    }
+    m_nExit = -1;
 }

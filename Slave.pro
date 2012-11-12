@@ -14,4 +14,5 @@ HEADERS += mainwindow.h \
     master.h
 FORMS += mainwindow.ui
 
-DEFINES += TEST
+DEFINES +=
+
