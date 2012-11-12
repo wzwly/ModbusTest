@@ -1,4 +1,4 @@
-#include "serial.h"
+#include "modbus.h"
 #include "slave.h"
 
 #include <QWSServer>
@@ -13,19 +13,18 @@
 #include <assert.h>
 
 #define szModbusCom "tty0"
-
 QSerial::TxRxBuffer QSerial::m_gTxRxBuffer;
 
-QSerial::TxRxBuffer QSerial::m_gMasterBuffer;
-QSerial::TxRxBuffer QSerial::m_gSlaveBuffer;
-
-
-QSerial::QSerial(DevSlave* pSlave_, QObject * p_)
+QSerial::QSerial(QObject * p_)
 {
-    m_nFdModbus = -1;
-    m_pSlave = pSlave_;
+    m_nFdModbus = -1;  
     InitModbus();
+    m_nTimer = startTimer(1); //开启定时器，1ms一次
+}
 
+void QSerial::SetModbus(Modbus* pSlave_)
+{
+    m_pSlave = pSlave_;
 }
 
 QSerial::~QSerial()
@@ -55,9 +54,7 @@ void QSerial::InitModbus()
         perror("tcsetattr   error");
         assert(false);
         exit(1);
-    }
-
-    m_nTimer = startTimer(1); //开启定时器，1ms一次
+    }   
     //注册响应
     QSocketNotifier* notify = new QSocketNotifier(m_nFdModbus, QSocketNotifier::Read, this);
     connect(notify, SIGNAL(activated(int)), this, SLOT(OnReceiveChar()));
@@ -66,9 +63,6 @@ void QSerial::InitModbus()
 
 void QSerial::OnReceiveChar()
 {
-    if (!m_gTxRxBuffer.bRxEn)
-        return;
-
     unsigned char _cRead[10];
     int _ret = Read(m_nFdModbus, _cRead, 10);
 
@@ -88,7 +82,6 @@ void QSerial::OnReceiveChar()
     }    
 }
 
-
 void QSerial::SendBuffer()
 {
     int _nSendLen = m_gTxRxBuffer.iTxLen;
@@ -99,21 +92,21 @@ void QSerial::SendBuffer()
         {
             //deal send erro
         }
-        else
-            m_gTxRxBuffer.m_nEchoTimeOut = 20;
     }
 }
-
 
 void QSerial::timerEvent(QTimerEvent *event_)
 {
     //in receive mode
-    if (m_nTemMs > 0 && m_gTxRxBuffer.iRxLen > 0)
+    if (m_gTxRxBuffer.bRxTimerEn)
     {
-        --m_nTemMs;
-        if (m_nTemMs == 0)
+        if (m_nTemMs > 0 && m_gTxRxBuffer.iRxLen > 0)
         {
-           m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
+            --m_nTemMs;
+            if (m_nTemMs == 0)
+            {
+                m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
+            }
         }
     }
 

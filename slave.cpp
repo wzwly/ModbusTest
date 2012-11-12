@@ -83,46 +83,24 @@ DevSlave::DevSlave(int nAddr_)
 {
        m_pBuffer = NULL;
        m_cSlaveAddr = nAddr_;
+       for (int _i  = 0; _i < 1024; ++_i)
+           m_arrayData[_i] = _i + 0x3300;
 }
 
-void DevSlave::GetCoilVal(unsigned short addr_,unsigned char *pData_)
-{ 
-    //只取低8位地址
-    int _Ret = 0;
-    addr_ =  addr_ % 8;
-    switch(addr_ & 0xff)
-    {
-    case 0:
-        _Ret = 0;
-        break;
-    case 1:
-        _Ret = 1;
-        break;
-    case 2:
-        _Ret = 1;
-        break;
-    case 3:
-        _Ret = 0;
-        break;
-    case 4:
-        _Ret = 0;
-        break;
-    case 5:
-        _Ret = 1;
-        break;
-    case 6:
-        _Ret = 1;
-        break;
-    case 7:
-        _Ret = 0;
-        break;
-    default:
-        break;
-    }
-    *pData_ = (unsigned char)_Ret;
+void DevSlave::GetRegVal(unsigned short addr_,unsigned short *pData_)
+{
+    if (addr_ >= 1024)
+    { *pData_ = 0;   return;}
+
+    *pData_ = m_arrayData[addr_];
 }
 
-void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
+ void DevSlave::SetRegVal(unsigned short addr_,unsigned short wData_)
+ {
+     m_arrayData[addr_] = wData_;
+ }
+
+void DevSlave::CheckCommModbus(QSerialEx::TxRxBuffer* pBuffer_)
 {
     if (m_pBuffer != pBuffer_)
         m_pBuffer = pBuffer_;
@@ -134,6 +112,7 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
     unsigned short _wTemp;
     unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
 
+    unsigned char _cmd = _pRecBuf[1];
     switch(_pRecBuf[1])
     {
     case 1://读取线圈状态(读取点 16位以内)
@@ -165,11 +144,17 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                     }
                     else if(_pRecBuf[1] == 6)
                     {
-                        PresetMultipleRegisters();
+                        PresetSingleRegister();
                     }
                 }
             }
-            m_pBuffer->iRxLen = 0;
+
+            if (QSerialEx::m_Semaphore.available())
+            {
+                QSerialEx::m_Semaphore.acquire();
+                 m_pBuffer->iRxLen = 0;
+                QSerialEx::m_Semaphore.release();
+            }
         }
         break;
 
@@ -188,7 +173,13 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                        ForceMultipleCoils();
                    }
                }
-               m_pBuffer->iRxLen = 0;
+
+               if (QSerialEx::m_Semaphore.available())
+               {
+                   QSerialEx::m_Semaphore.acquire();
+                    m_pBuffer->iRxLen = 0;
+                   QSerialEx::m_Semaphore.release();
+               }
            }
            break;
 
@@ -208,7 +199,12 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                        PresetMultipleRegisters();
                    }
                }
-               m_pBuffer->iRxLen = 0;
+               if (QSerialEx::m_Semaphore.available())
+               {
+                   QSerialEx::m_Semaphore.acquire();
+                    m_pBuffer->iRxLen = 0;
+                   QSerialEx::m_Semaphore.release();
+               }
            }
            break;
 
@@ -232,7 +228,7 @@ void DevSlave::ReadCoil(void)
         _byteCnt++;
 
     unsigned short _MaxAddr = _wAddr + _bitCnt;
-    unsigned char _tempData;
+    unsigned short _tempData;
 
     bool _bExit = false;
     for(int _k = 0; _k < _byteCnt; ++_k)
@@ -241,8 +237,10 @@ void DevSlave::ReadCoil(void)
         _pTxBuf[_k + 3] = 0;
         for(int _i = 0; _i < 8; ++_i)
         {
-            GetCoilVal(_wAddr++,&_tempData);
-            _pTxBuf[_k + 3] |= _tempData << _i;
+            GetRegVal(_wAddr++,&_tempData);
+            if (_tempData > 0)
+             _pTxBuf[_k + 3] |= 0x01 << _i;
+
             if(_wAddr >= _MaxAddr)
             {	//读完
                 _bExit = true;
@@ -278,16 +276,16 @@ void DevSlave::ReadRegisters()
     unsigned short _ReadCnt = MakeShort(_pRecBuf[4],_pRecBuf[5]);
     _byteCnt = _ReadCnt * 2;
 
-    unsigned short _tempData = 0x5555;
+    unsigned short _tempData;
     for(int _i=0;_i < _byteCnt; _i += 2)
     {
-        //getRegisterVal(tempAddr,&tempData);
+        GetRegVal(_wAddr++,&_tempData);
         _pTxBuf[_i+3] = _tempData >> 8;
         _pTxBuf[_i+4] = _tempData & 0xff;
     }
     qDebug() << "read data ok , cmd 3";
     _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = 3;
+    _pTxBuf[1] = 0x03;
     _pTxBuf[2] = _byteCnt;
     _byteCnt += 3;
     unsigned short _crcData = crc16(_pTxBuf,_byteCnt);
@@ -317,7 +315,7 @@ void DevSlave::ForceSingleCoil()
         _tempData = 0;
     }
 
-    //setCoilVal(tempAddr,tempData);
+    SetRegVal(_wAddr, _onOff);
     qDebug() <<"Set the Coil Val";
 
     for(int _i=0; _i< m_pBuffer->iRxLen; ++_i)
@@ -335,19 +333,18 @@ void DevSlave::PresetSingleRegister()//6
     unsigned char* _pRecBuf = m_pBuffer->szRxBuffer;
     unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
 
-    unsigned short _tempData;
     unsigned short _wAddr = MakeShort(_pRecBuf[2],_pRecBuf[3]);
+    unsigned short _tempData = MakeShort(_pRecBuf[4], _pRecBuf[5]);
 
-    _tempData = MakeShort(_pRecBuf[4], _pRecBuf[5]);
-    //setRegisterVal(_wAddr + _i,_tempData;
-    qDebug()<< "write ok ,cmd 16";
+    SetRegVal(_wAddr, _tempData);
+    qDebug()<< "write ok ,cmd 6";
 
     for(int _i=0; _i< m_pBuffer->iRxLen; ++_i)
     {
         _pTxBuf[_i] = _pRecBuf[_i];
     }
     m_pBuffer->iTxLen = m_pBuffer->iRxLen;
-     BegineSend();
+    BegineSend();
 }
 
 void DevSlave::ForceMultipleCoils() //15
@@ -370,10 +367,12 @@ void DevSlave::ForceMultipleCoils() //15
             if (_ch & (0x01 << _k))
             {
                 //Set _wAddr + _iSet whith ON
+                SetRegVal(_wAddr + _iSet, 0xffff);
             }
             else
             {
                 //Set _wAddr + _iSet whith OFF
+                SetRegVal(_wAddr + _iSet, 0x00);
             }
 
             _iSet++;
@@ -387,7 +386,7 @@ void DevSlave::ForceMultipleCoils() //15
     qDebug() <<"Set the Coil Val";
 
     _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = _pTxBuf[1];
+    _pTxBuf[1] = 0x0f;
     _pTxBuf[2] = _wAddr >> 8;
     _pTxBuf[3] = _wAddr & 0xff;
     _pTxBuf[4] = _setCnt >> 8;
@@ -414,12 +413,11 @@ void DevSlave::PresetMultipleRegisters()
     for(int _i=0; _i < _setCnt;++_i)
     {
         _tempData = MakeShort(_pRecBuf[_i*2 + 7], _pRecBuf[_i*2 + 8]);
-        //setRegisterVal(_wAddr + _i,_tempData;
-        qDebug()<< "write ok ,cmd 16";
+        SetRegVal(_wAddr + _i,_tempData);       
     }
-
+    qDebug()<< "write ok ,cmd 16";
     _pTxBuf[0] = m_cSlaveAddr;
-    _pTxBuf[1] = _pTxBuf[1];
+    _pTxBuf[1] = 0x10;
     _pTxBuf[2] = _wAddr >> 8;
     _pTxBuf[3] = _wAddr & 0xff;
     _pTxBuf[4] = _setCnt >> 8;
@@ -434,8 +432,19 @@ void DevSlave::PresetMultipleRegisters()
 
 void DevSlave::BegineSend()
 {
+#if TEST
     unsigned char* _pRecBuf = QSerial::m_gMasterBuffer.szRxBuffer;
     unsigned char* _pTxBuf = m_pBuffer->szTxBuffer;
     QSerial::m_gMasterBuffer.iRxLen = m_pBuffer->iTxLen;
     memcpy(_pRecBuf, _pTxBuf, m_pBuffer->iTxLen);
+#else
+    m_pBuffer->bTxEn = true;
+    if (QSerialEx::m_Semaphore.available())
+    {
+        QSerialEx::m_Semaphore.acquire();
+        m_pBuffer->iRxLen = 0;
+        QSerialEx::m_gMasterBuffer.iRxLen = 0;
+        QSerialEx::m_Semaphore.release();
+    }
+#endif
 }

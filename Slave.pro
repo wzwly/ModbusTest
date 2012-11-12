@@ -7,11 +7,14 @@ SOURCES += main.cpp \
     mainwindow.cpp \
     serial.cpp \
     slave.cpp \
-    master.cpp
+    master.cpp \
+    serialex.cpp \
+    modbus.cpp
 HEADERS += mainwindow.h \
     serial.h \
     slave.h \
-    master.h
+    master.h \
+    serialex.h \
+    modbus.h
 FORMS += mainwindow.ui
-
-DEFINES += TEST
+DEFINES += 

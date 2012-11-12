@@ -2,9 +2,11 @@
 #define SERIAL_H
 
 #include <QObject>
+#include <QThread>
+#include <QSemaphore>
 
 //该宏定义硬件的操作，因此，对硬件的操作函用这里的宏来写，就不用加编译条件了
-#if 1//ARM
+#if 1 //ARM
     #define  Write(a, b, c)  write(a, b, c)
     #define  Ioctl(a,b,c)   ioctl(a, b, c)
     #define  Open(a,b) open(a, b)
@@ -27,12 +29,12 @@
 #endif
 
 
-class DevSlave;
+class Modbus;
 class QSerial : public QObject
 {
     Q_OBJECT
 public:
-    QSerial(DevSlave* pSlave_,QObject * p_);
+    QSerial(QObject * p_);
     ~QSerial();
     enum
     {
@@ -44,32 +46,32 @@ public:
         unsigned char szRxBuffer[MAX_BUFFER_SIZE];
         int  iRxLen;
         int  iTxLen;
-        bool bRxEn;
+        bool bRxTimerEn;
         int m_nEchoTimeOut;
         TxRxBuffer()
         {
             iRxLen = 0; iTxLen = 0;
-            bRxEn = true;
+            bRxTimerEn = true;
         };
     };
 
 protected:
     void InitModbus();
     void timerEvent(QTimerEvent *event_); //定时器响应函数
+
 private slots:
     void OnReceiveChar();
-
 private:
     int m_nFdModbus;//
     int m_nTimer;
     int m_nTemMs;
-    DevSlave* m_pSlave;
+    Modbus* m_pSlave;
+
+    int m_nExit;
 public:
     static TxRxBuffer m_gTxRxBuffer;
-    static TxRxBuffer m_gMasterBuffer;
-    static TxRxBuffer m_gSlaveBuffer;
     void SendBuffer();
-    void ClearReceive(){ m_gTxRxBuffer.iRxLen = 0;}
+    void SetModbus(Modbus* pSlave_);
 };
 
 #endif // SERIAL_H

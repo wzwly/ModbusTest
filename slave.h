@@ -2,7 +2,7 @@
 #define SLAVE_H
 
 #include <QDebug>
-#include "serial.h"
+#include "serialex.h"
 
 class DevSlave
 {
@@ -10,17 +10,18 @@ public:
     DevSlave(int nAddr_ = 1);
 
 public:
-    void CheckCommModbus(QSerial::TxRxBuffer* pBuffer_);
+    void CheckCommModbus(QSerialEx::TxRxBuffer* pBuffer_);
 
 private:
     void ReadCoil();    //1
     void ReadRegisters(void);//3
     void ForceSingleCoil(); //5
-    void PresetSingleRegister(); //6-->16
+    void PresetSingleRegister(); //6
     void ForceMultipleCoils(); //15
     void PresetMultipleRegisters();//16
     //===========================
-    void GetCoilVal(unsigned short addr_,unsigned char *pData_);
+    void GetRegVal(unsigned short addr_,unsigned short *pData_);
+    void SetRegVal(unsigned short addr_,unsigned short wData_);
     //unsigned short GetRegisterVal(unsigned short addr_,unsigned short *pData_);
     //unsigned short setRegisterVal(unsigned short addr_,unsigned short wData_);
     //unsigned short setCoilVal(unsigned short addr_,unsigned short wData_);
@@ -31,8 +32,9 @@ private:
     };
     void BegineSend();
 private:
-    QSerial::TxRxBuffer* m_pBuffer;
+    QSerialEx::TxRxBuffer* m_pBuffer;
     unsigned char m_cSlaveAddr;
+    unsigned short m_arrayData[1024];
     /*
      01(0x01 读线圈) 读去多个线圈状态，每个线圈是一个bit位
      请求码格式：【Dev】[0x01][地址高字节][地址低字节][读取数量高字节][读取数量低字节][Crc低字节][Crc高字节]
