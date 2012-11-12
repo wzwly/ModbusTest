@@ -15,12 +15,16 @@
 #define szModbusCom "tty0"
 QSerial::TxRxBuffer QSerial::m_gTxRxBuffer;
 
-QSerial::QSerial(Modbus* pSlave_, QObject * p_)
+QSerial::QSerial(QObject * p_)
 {
-    m_nFdModbus = -1;
-    m_pSlave = pSlave_;
-    //InitModbus();
+    m_nFdModbus = -1;  
+    InitModbus();
     m_nTimer = startTimer(1); //开启定时器，1ms一次
+}
+
+void QSerial::SetModbus(Modbus* pSlave_)
+{
+    m_pSlave = pSlave_;
 }
 
 QSerial::~QSerial()
@@ -59,9 +63,6 @@ void QSerial::InitModbus()
 
 void QSerial::OnReceiveChar()
 {
-    if (!m_gTxRxBuffer.bRxEn)
-        return;
-
     unsigned char _cRead[10];
     int _ret = Read(m_nFdModbus, _cRead, 10);
 
@@ -81,7 +82,6 @@ void QSerial::OnReceiveChar()
     }    
 }
 
-
 void QSerial::SendBuffer()
 {
     int _nSendLen = m_gTxRxBuffer.iTxLen;
@@ -95,18 +95,20 @@ void QSerial::SendBuffer()
     }
 }
 
-
 void QSerial::timerEvent(QTimerEvent *event_)
 {
     //in receive mode
-   // if (m_nTemMs > 0 && m_gTxRxBuffer.iRxLen > 0)
-   // {
-   //     --m_nTemMs;
-   //     if (m_nTemMs == 0)
-   //     {
-    //       m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
-   //     }
-   // }
+    if (m_gTxRxBuffer.bRxTimerEn)
+    {
+        if (m_nTemMs > 0 && m_gTxRxBuffer.iRxLen > 0)
+        {
+            --m_nTemMs;
+            if (m_nTemMs == 0)
+            {
+                m_gTxRxBuffer.iRxLen = 0; //receive time out, start a new package
+            }
+        }
+    }
 
     if (m_gTxRxBuffer.m_nEchoTimeOut > 0)
         m_gTxRxBuffer.m_nEchoTimeOut--;

@@ -34,7 +34,7 @@ class QSerial : public QObject
 {
     Q_OBJECT
 public:
-    QSerial(Modbus* pSlave_,QObject * p_);
+    QSerial(QObject * p_);
     ~QSerial();
     enum
     {
@@ -46,14 +46,12 @@ public:
         unsigned char szRxBuffer[MAX_BUFFER_SIZE];
         int  iRxLen;
         int  iTxLen;
-        bool bRxEn;
-        bool bTxEn;
+        bool bRxTimerEn;
         int m_nEchoTimeOut;
         TxRxBuffer()
         {
             iRxLen = 0; iTxLen = 0;
-            bRxEn = true;
-            bTxEn = false;
+            bRxTimerEn = true;
         };
     };
 
@@ -73,7 +71,7 @@ private:
 public:
     static TxRxBuffer m_gTxRxBuffer;
     void SendBuffer();
-    //void ClearReceive(){ m_gTxRxBuffer.iRxLen = 0;}
+    void SetModbus(Modbus* pSlave_);
 };
 
 #endif // SERIAL_H
