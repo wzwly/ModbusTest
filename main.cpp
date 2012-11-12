@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
     //MainWindow w;
     //w.show();
     //return a.exec();
-    DevMaster _master(1,&QSerial::m_gMasterBuffer);
+    //DevMaster _master(1,&QSerial::m_gMasterBuffer);
     DevSlave  _Slave(1);
 
 #if TEST
@@ -59,8 +59,8 @@ int main(int argc, char *argv[])
 #endif
 
 #else
-    QSerial _Serial(&_Slave, NULL);
-    _Serial.StartThread(QThread::NormalPriority);
+    //QSerial _Serial(&_Slave, NULL);
+   // _Serial.StartThread(QThread::NormalPriority);
 
 # if 0 //5
      _master.ForceSingleCoil(0x101, 1);
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     _master.ForceMultipleCoils(0x101, 8, _out);
 #endif
 
-#if 1  // 16 test Write
+#if 0  // 16 test Write
     unsigned short _outReg[5] = {0xee33, 0xccd7, 0xddc8, 0xffb9, 0x45aa};
     _master.PresetMultipleRegisters(0x101, 0x5, (unsigned char*)_outReg);
 #endif
@@ -86,13 +86,13 @@ int main(int argc, char *argv[])
     _master.ReadCoil(0x100, 0 ,_io);
 #endif
 
-#if 1  // 3 test Read
+#if 0  // 3 test Read
     unsigned char _reg[32] = {0x0};
     _master.ReadRegisters(0x101, 10 , _reg);
 #endif
 
-    _Serial.ExitThread();
-    while(!_Serial.IsExit())
+    //_Serial.ExitThread();
+    //while(!_Serial.IsExit())
     sleep(1);
 #endif
     return 0;

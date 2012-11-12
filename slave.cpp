@@ -100,7 +100,7 @@ void DevSlave::GetRegVal(unsigned short addr_,unsigned short *pData_)
      m_arrayData[addr_] = wData_;
  }
 
-void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
+void DevSlave::CheckCommModbus(QSerialEx::TxRxBuffer* pBuffer_)
 {
     if (m_pBuffer != pBuffer_)
         m_pBuffer = pBuffer_;
@@ -149,11 +149,11 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                 }
             }
 
-            if (QSerial::m_Semaphore.available())
+            if (QSerialEx::m_Semaphore.available())
             {
-                QSerial::m_Semaphore.acquire();
+                QSerialEx::m_Semaphore.acquire();
                  m_pBuffer->iRxLen = 0;
-                QSerial::m_Semaphore.release();
+                QSerialEx::m_Semaphore.release();
             }
         }
         break;
@@ -174,11 +174,11 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                    }
                }
 
-               if (QSerial::m_Semaphore.available())
+               if (QSerialEx::m_Semaphore.available())
                {
-                   QSerial::m_Semaphore.acquire();
+                   QSerialEx::m_Semaphore.acquire();
                     m_pBuffer->iRxLen = 0;
-                   QSerial::m_Semaphore.release();
+                   QSerialEx::m_Semaphore.release();
                }
            }
            break;
@@ -199,11 +199,11 @@ void DevSlave::CheckCommModbus(QSerial::TxRxBuffer* pBuffer_)
                        PresetMultipleRegisters();
                    }
                }
-               if (QSerial::m_Semaphore.available())
+               if (QSerialEx::m_Semaphore.available())
                {
-                   QSerial::m_Semaphore.acquire();
+                   QSerialEx::m_Semaphore.acquire();
                     m_pBuffer->iRxLen = 0;
-                   QSerial::m_Semaphore.release();
+                   QSerialEx::m_Semaphore.release();
                }
            }
            break;
@@ -439,12 +439,12 @@ void DevSlave::BegineSend()
     memcpy(_pRecBuf, _pTxBuf, m_pBuffer->iTxLen);
 #else
     m_pBuffer->bTxEn = true;
-    if (QSerial::m_Semaphore.available())
+    if (QSerialEx::m_Semaphore.available())
     {
-        QSerial::m_Semaphore.acquire();
+        QSerialEx::m_Semaphore.acquire();
         m_pBuffer->iRxLen = 0;
-        QSerial::m_gMasterBuffer.iRxLen = 0;
-        QSerial::m_Semaphore.release();
+        QSerialEx::m_gMasterBuffer.iRxLen = 0;
+        QSerialEx::m_Semaphore.release();
     }
 #endif
 }

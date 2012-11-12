@@ -79,7 +79,7 @@ static unsigned short crc16(unsigned char *puchMsg, unsigned int nDataLen)
 }
 
 
-DevMaster::DevMaster(int nAddr_, QSerial::TxRxBuffer* pBuffer_)
+DevMaster::DevMaster(int nAddr_, QSerialEx::TxRxBuffer* pBuffer_)
 :m_nRepeatTime(300)
 {
        m_pBuffer = pBuffer_;
@@ -95,14 +95,14 @@ void DevMaster::BegineSend()
     memcpy(_pRecBuf, _pTxBuf, m_pBuffer->iTxLen);
 #else
 
-    if (QSerial::m_Semaphore.available())
+    if (QSerialEx::m_Semaphore.available())
     {
-        QSerial::m_Semaphore.acquire();
+        QSerialEx::m_Semaphore.acquire();
         m_pBuffer->bTxEn = true;
         m_pBuffer->m_nEchoTimeOut = 20;
         m_pBuffer->iRxLen = 0;
-        QSerial::m_gSlaveBuffer.iRxLen = 0;
-        QSerial::m_Semaphore.release();
+        QSerialEx::m_gSlaveBuffer.iRxLen = 0;
+        QSerialEx::m_Semaphore.release();
     }
 #endif
 }

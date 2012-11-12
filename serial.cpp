@@ -1,4 +1,4 @@
-#include "serial.h"
+#include "modbus.h"
 #include "slave.h"
 
 #include <QWSServer>
@@ -13,14 +13,9 @@
 #include <assert.h>
 
 #define szModbusCom "tty0"
-
 QSerial::TxRxBuffer QSerial::m_gTxRxBuffer;
 
-QSerial::TxRxBuffer QSerial::m_gMasterBuffer;
-QSerial::TxRxBuffer QSerial::m_gSlaveBuffer;
-QSemaphore QSerial::m_Semaphore(1);
-
-QSerial::QSerial(DevSlave* pSlave_, QObject * p_)
+QSerial::QSerial(Modbus* pSlave_, QObject * p_)
 {
     m_nFdModbus = -1;
     m_pSlave = pSlave_;
@@ -115,43 +110,4 @@ void QSerial::timerEvent(QTimerEvent *event_)
 
     if (m_gTxRxBuffer.m_nEchoTimeOut > 0)
         m_gTxRxBuffer.m_nEchoTimeOut--;
-}
-
-void QSerial::run()
-{
-    QSerial::TxRxBuffer* _pMaster = &m_gMasterBuffer;
-    QSerial::TxRxBuffer* _pSlave = &m_gSlaveBuffer;
-    while(m_nExit)
-    {
-        usleep(1);
-
-        if (QSerial::m_Semaphore.available())
-        {
-            QSerial::m_Semaphore.acquire();
-            if (_pMaster->bTxEn)
-            {
-                if (_pSlave->iRxLen < _pMaster->iTxLen)
-                {
-                    _pSlave->szRxBuffer[_pSlave->iRxLen] = _pMaster->szTxBuffer[_pSlave->iRxLen];
-                    _pSlave->iRxLen++;
-                    m_pSlave->CheckCommModbus(_pSlave);
-                }
-                else
-                    _pMaster->bTxEn = false;
-            }
-
-            if (_pSlave->bTxEn)
-            {
-                if (_pMaster->iRxLen < _pSlave->iTxLen)
-                {
-                    _pMaster->szRxBuffer[_pMaster->iRxLen] = _pSlave->szTxBuffer[_pMaster->iRxLen];
-                    _pMaster->iRxLen++;
-                }
-                else
-                    _pSlave->bTxEn = false;
-            }
-            QSerial::m_Semaphore.release();
-        }
-    }
-    m_nExit = -1;
 }

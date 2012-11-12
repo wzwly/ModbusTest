@@ -3,7 +3,7 @@
 
 
 #include <QDebug>
-#include "serial.h"
+#include "serialex.h"
 
 class DevMaster
 {
@@ -14,7 +14,7 @@ public:
         ECHO_ERRO,
         RECEIVE_STATUS,
     };
-    DevMaster(int nAddr_ = 1, QSerial::TxRxBuffer* pBuffer_ = NULL);
+    DevMaster(int nAddr_ = 1, QSerialEx::TxRxBuffer* pBuffer_ = NULL);
 
 public:
 
@@ -42,7 +42,7 @@ private:
     };
     void BegineSend();
 private:
-    QSerial::TxRxBuffer* m_pBuffer;
+    QSerialEx::TxRxBuffer* m_pBuffer;
     unsigned char m_cSlaveAddr;
     const int m_nRepeatTime;
     /*

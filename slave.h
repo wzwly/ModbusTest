@@ -2,7 +2,7 @@
 #define SLAVE_H
 
 #include <QDebug>
-#include "serial.h"
+#include "serialex.h"
 
 class DevSlave
 {
@@ -10,7 +10,7 @@ public:
     DevSlave(int nAddr_ = 1);
 
 public:
-    void CheckCommModbus(QSerial::TxRxBuffer* pBuffer_);
+    void CheckCommModbus(QSerialEx::TxRxBuffer* pBuffer_);
 
 private:
     void ReadCoil();    //1
@@ -32,7 +32,7 @@ private:
     };
     void BegineSend();
 private:
-    QSerial::TxRxBuffer* m_pBuffer;
+    QSerialEx::TxRxBuffer* m_pBuffer;
     unsigned char m_cSlaveAddr;
     unsigned short m_arrayData[1024];
     /*
